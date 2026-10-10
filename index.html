@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BlackRun - Experimental</title>
   <style>
     * {
@@ -10,6 +10,7 @@
       margin: 0;
       padding: 0;
     }
+
     body {
       background-color: #ffffff;
       color: #000000;
@@ -19,321 +20,314 @@
       align-items: center;
       justify-content: center;
       min-height: 100vh;
+      overflow: hidden;
       user-select: none;
+      -webkit-user-select: none;
+      position: relative;
     }
-    .header {
+
+    #game-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+
+    header {
       text-align: center;
-      margin-bottom: 15px;
+      margin-bottom: 20px;
     }
+
     h1 {
-      font-size: 1.8rem;
-      letter-spacing: 2px;
+      font-size: 28px;
+      letter-spacing: 4px;
+      margin-bottom: 8px;
       text-transform: uppercase;
     }
+
     .badge {
-      display: inline-block;
-      background-color: #000;
+      font-size: 10px;
+      background: #000;
       color: #fff;
-      font-size: 0.75rem;
-      padding: 3px 8px;
-      border-radius: 3px;
-      margin-left: 8px;
+      padding: 2px 6px;
       vertical-align: middle;
+      letter-spacing: 1px;
     }
-    .score-board {
-      display: flex;
-      gap: 30px;
-      font-size: 1.1rem;
+
+    .scoreboard {
+      font-size: 16px;
       font-weight: bold;
-      margin-bottom: 10px;
+      margin-top: 10px;
+      letter-spacing: 2px;
     }
-    #gameCanvas {
+
+    canvas {
       background-color: #ffffff;
-      border-bottom: 3px solid #000000;
+      display: block;
       cursor: pointer;
     }
+
     .controls-hint {
       margin-top: 15px;
-      font-size: 0.9rem;
-      color: #444;
+      font-size: 12px;
+      color: #333333;
+      text-align: center;
+    }
+
+    footer {
+      position: absolute;
+      bottom: 20px;
+      right: 30px;
+      font-size: 12px;
+      color: #000000;
+      font-family: Arial, sans-serif;
     }
   </style>
 </head>
 <body>
 
-  <div class="header">
-    <h1>BlackRun <span class="badge">EXPERIMENTAL</span></h1>
+  <div id="game-container">
+    <header>
+      <h1>BlackRun <span class="badge">EXPERIMENTAL</span></h1>
+      <div class="scoreboard">
+        PONTOS: <span id="score">0</span> &nbsp;&nbsp; RECORDES: <span id="highscore">0</span>
+      </div>
+    </header>
+
+    <canvas id="gameCanvas" width="800" height="200"></canvas>
+
+    <div class="controls-hint">
+      Pressione <strong>ESPAÇO</strong> ou <strong>CLIQUE NA TELA</strong> para saltar.
+    </div>
   </div>
 
-  <div class="score-board">
-    <div>PONTOS: <span id="score">0</span></div>
-    <div>RECORDE: <span id="highScore">0</span></div>
-  </div>
-
-  <canvas id="gameCanvas" width="800" height="250"></canvas>
-
-  <div class="controls-hint">
-    Pressione <strong>ESPAÇO</strong> ou <strong>CLIQUE NA TELA</strong> para saltar.
-  </div>
+  <footer>
+    Produção: Jefferson Gilvan Gomes dos Santos
+  </footer>
 
   <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
 
-    const scoreEl = document.getElementById('score');
-    const highScoreEl = document.getElementById('highScore');
+    const scoreElement = document.getElementById('score');
+    const highscoreElement = document.getElementById('highscore');
 
     let isGameRunning = false;
     let isGameOver = false;
     let score = 0;
-    let highScore = 0;
-    let animationFrameId;
+    let highScore = localStorage.getItem('blackrun_highscore') || 0;
+    highscoreElement.textContent = highScore;
+
+    let gameSpeed = 5;
+    let frameCount = 0;
+
+    const groundY = 160;
 
     const player = {
       x: 80,
-      y: 190,
+      y: groundY,
       width: 20,
-      height: 50,
+      height: 40,
       velocityY: 0,
-      gravity: 0.8,
-      jumpStrength: -13,
+      gravity: 0.7,
+      jumpForce: -11,
       isGrounded: true,
-      animFrame: 0
+      legAngle: 0
     };
 
     let obstacles = [];
-    let obstacleTimer = 0;
-    let gameSpeed = 6;
-
-    function drawStickman(x, y, frame, isJumping) {
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 3;
-      ctx.lineCap = 'round';
-
-      const headRadius = 8;
-      const headY = y - 42;
-
-      ctx.beginPath();
-      ctx.arc(x, headY, headRadius, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.moveTo(x, headY + headRadius);
-      ctx.lineTo(x, y - 18);
-      ctx.stroke();
-
-      if (isJumping) {
-        ctx.beginPath();
-        ctx.moveTo(x, headY + 12);
-        ctx.lineTo(x - 12, headY + 2);
-        ctx.moveTo(x, headY + 12);
-        ctx.lineTo(x + 12, headY + 2);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.moveTo(x, y - 18);
-        ctx.lineTo(x - 10, y - 10);
-        ctx.lineTo(x - 5, y - 2);
-        ctx.moveTo(x, y - 18);
-        ctx.lineTo(x + 10, y - 10);
-        ctx.lineTo(x + 5, y - 2);
-        ctx.stroke();
-      } else {
-        const cycle = Math.floor(frame / 6) % 4;
-
-        ctx.beginPath();
-        if (cycle === 0 || cycle === 2) {
-          ctx.moveTo(x, headY + 12);
-          ctx.lineTo(x - 10, headY + 22);
-          ctx.moveTo(x, headY + 12);
-          ctx.lineTo(x + 10, headY + 22);
-        } else if (cycle === 1) {
-          ctx.moveTo(x, headY + 12);
-          ctx.lineTo(x - 12, headY + 18);
-          ctx.moveTo(x, headY + 12);
-          ctx.lineTo(x + 8, headY + 24);
-        } else {
-          ctx.moveTo(x, headY + 12);
-          ctx.lineTo(x + 12, headY + 18);
-          ctx.moveTo(x, headY + 12);
-          ctx.lineTo(x - 8, headY + 24);
-        }
-        ctx.stroke();
-
-        ctx.beginPath();
-        if (cycle === 0) {
-          ctx.moveTo(x, y - 18);
-          ctx.lineTo(x - 12, y);
-          ctx.moveTo(x, y - 18);
-          ctx.lineTo(x + 12, y);
-        } else if (cycle === 1) {
-          ctx.moveTo(x, y - 18);
-          ctx.lineTo(x - 15, y - 5);
-          ctx.lineTo(x - 18, y);
-          ctx.moveTo(x, y - 18);
-          ctx.lineTo(x + 8, y);
-        } else if (cycle === 2) {
-          ctx.moveTo(x, y - 18);
-          ctx.lineTo(x + 12, y);
-          ctx.moveTo(x, y - 18);
-          ctx.lineTo(x - 12, y);
-        } else {
-          ctx.moveTo(x, y - 18);
-          ctx.lineTo(x + 15, y - 5);
-          ctx.lineTo(x + 18, y);
-          ctx.moveTo(x, y - 18);
-          ctx.lineTo(x - 8, y);
-        }
-        ctx.stroke();
-      }
-    }
-
-    function drawObstacle(obs) {
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 3;
-      ctx.lineCap = 'round';
-
-      if (obs.type === 'trapezoide') {
-        ctx.beginPath();
-        ctx.moveTo(obs.x, canvas.height - 20);
-        ctx.lineTo(obs.x + 8, canvas.height - 20 - obs.height);
-        ctx.lineTo(obs.x + obs.width - 8, canvas.height - 20 - obs.height);
-        ctx.lineTo(obs.x + obs.width, canvas.height - 20);
-        ctx.stroke();
-      } else if (obs.type === 'voador') {
-        ctx.beginPath();
-        ctx.moveTo(obs.x, obs.y);
-        ctx.lineTo(obs.x + 15, obs.y + 10);
-        ctx.lineTo(obs.x + 30, obs.y);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.arc(obs.x + 15, obs.y + 10, 4, 0, Math.PI * 2);
-        ctx.fillStyle = '#000';
-        ctx.fill();
-      }
-    }
-
-    function drawGround() {
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(0, canvas.height - 20);
-      ctx.lineTo(canvas.width, canvas.height - 20);
-      ctx.stroke();
-    }
-
-    function jump() {
-      if (player.isGrounded && isGameRunning && !isGameOver) {
-        player.velocityY = player.jumpStrength;
-        player.isGrounded = false;
-      }
-    }
 
     function resetGame() {
       score = 0;
-      gameSpeed = 6;
+      gameSpeed = 5;
+      frameCount = 0;
       obstacles = [];
-      player.y = canvas.height - 20;
+      player.y = groundY;
       player.velocityY = 0;
       player.isGrounded = true;
       isGameOver = false;
       isGameRunning = true;
-      scoreEl.textContent = score;
-      loop();
+      scoreElement.textContent = score;
     }
 
-    function loop() {
+    function jump() {
+      if (player.isGrounded && isGameRunning) {
+        player.velocityY = player.jumpForce;
+        player.isGrounded = false;
+      }
+    }
+
+    function spawnObstacle() {
+      const minGap = 90;
+      const lastObstacle = obstacles[obstacles.length - 1];
+
+      if (!lastObstacle || (canvas.width - lastObstacle.x) > (minGap + Math.random() * 150)) {
+        const height = 25 + Math.random() * 20;
+        obstacles.push({
+          x: canvas.width,
+          y: groundY - height,
+          width: 20,
+          height: height
+        });
+      }
+    }
+
+    function update() {
+      if (!isGameRunning || isGameOver) return;
+
+      frameCount++;
+      if (frameCount % 6 === 0) {
+        score++;
+        scoreElement.textContent = score;
+        if (score > highScore) {
+          highScore = score;
+          highscoreElement.textContent = highScore;
+          localStorage.setItem('blackrun_highscore', highScore);
+        }
+
+        if (score % 100 === 0) {
+          gameSpeed += 0.5;
+        }
+      }
+
+      player.velocityY += player.gravity;
+      player.y += player.velocityY;
+
+      if (player.y >= groundY) {
+        player.y = groundY;
+        player.velocityY = 0;
+        player.isGrounded = true;
+      }
+
+      if (player.isGrounded) {
+        player.legAngle += 0.2;
+      }
+
+      if (Math.random() < 0.02) {
+        spawnObstacle();
+      }
+
+      for (let i = 0; i < obstacles.length; i++) {
+        let obs = obstacles[i];
+        obs.x -= gameSpeed;
+
+        const pLeft = player.x - 10;
+        const pRight = player.x + 10;
+        const pTop = player.y - player.height;
+        const pBottom = player.y;
+
+        const oLeft = obs.x;
+        const oRight = obs.x + obs.width;
+        const oTop = obs.y;
+        const oBottom = obs.y + obs.height;
+
+        if (pRight > oLeft && pLeft < oRight && pBottom > oTop && pTop < oBottom) {
+          isGameOver = true;
+          isGameRunning = false;
+        }
+      }
+
+      obstacles = obstacles.filter(obs => obs.x + obs.width > 0);
+    }
+
+    function drawStickman(x, y, runningAngle, isJumping) {
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+
+      const headRadius = 7;
+      const headY = y - 33;
+      ctx.beginPath();
+      ctx.arc(x, headY, headRadius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      const neckY = headY + headRadius;
+      const hipY = y - 12;
+      ctx.beginPath();
+      ctx.moveTo(x, neckY);
+      ctx.lineTo(x, hipY);
+      ctx.stroke();
+
+      const shoulderY = neckY + 4;
+      ctx.beginPath();
+      if (isJumping) {
+        ctx.moveTo(x, shoulderY);
+        ctx.lineTo(x - 10, shoulderY - 8);
+        ctx.moveTo(x, shoulderY);
+        ctx.lineTo(x + 10, shoulderY - 8);
+      } else {
+        const armOffset = Math.sin(runningAngle) * 8;
+        ctx.moveTo(x, shoulderY);
+        ctx.lineTo(x - 8, shoulderY + armOffset);
+        ctx.moveTo(x, shoulderY);
+        ctx.lineTo(x + 8, shoulderY - armOffset);
+      }
+      ctx.stroke();
+
+      ctx.beginPath();
+      if (isJumping) {
+        ctx.moveTo(x, hipY);
+        ctx.lineTo(x - 8, y - 4);
+        ctx.lineTo(x - 12, y);
+
+        ctx.moveTo(x, hipY);
+        ctx.lineTo(x + 6, y - 6);
+        ctx.lineTo(x + 8, y);
+      } else {
+        const legOffset = Math.sin(runningAngle) * 10;
+        ctx.moveTo(x, hipY);
+        ctx.lineTo(x + legOffset, y);
+
+        ctx.moveTo(x, hipY);
+        ctx.lineTo(x - legOffset, y);
+      }
+      ctx.stroke();
+    }
+
+    function drawObstacle(obs) {
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 2.5;
+
+      ctx.beginPath();
+      ctx.moveTo(obs.x, obs.y + obs.height);
+      ctx.lineTo(obs.x + 4, obs.y);
+      ctx.lineTo(obs.x + obs.width - 4, obs.y);
+      ctx.lineTo(obs.x + obs.width, obs.y + obs.height);
+      ctx.closePath();
+      ctx.stroke();
+    }
+
+    function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      drawGround();
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 3;
 
-      if (isGameRunning && !isGameOver) {
-        player.velocityY += player.gravity;
-        player.y += player.velocityY;
+      ctx.beginPath();
+      ctx.moveTo(0, groundY);
+      ctx.lineTo(canvas.width, groundY);
+      ctx.stroke();
 
-        if (player.y >= canvas.height - 20) {
-          player.y = canvas.height - 20;
-          player.velocityY = 0;
-          player.isGrounded = true;
-        }
+      ctx.beginPath();
+      ctx.moveTo(0, groundY + 12);
+      ctx.lineTo(canvas.width, groundY + 12);
+      ctx.stroke();
 
-        player.animFrame++;
+      if (isGameRunning || isGameOver) {
+        drawStickman(player.x, player.y, player.legAngle, !player.isGrounded);
 
-        obstacleTimer++;
-        if (obstacleTimer > Math.max(50, 100 - Math.floor(score / 50))) {
-          obstacleTimer = 0;
-          const isAir = Math.random() > 0.7;
-          if (isAir) {
-            obstacles.push({
-              x: canvas.width,
-              y: canvas.height - 85,
-              width: 30,
-              height: 15,
-              type: 'voador'
-            });
-          } else {
-            obstacles.push({
-              x: canvas.width,
-              y: canvas.height - 20,
-              width: 35,
-              height: 35 + Math.floor(Math.random() * 15),
-              type: 'trapezoide'
-            });
-          }
-        }
-
-        for (let i = obstacles.length - 1; i >= 0; i--) {
-          const obs = obstacles[i];
-          obs.x -= gameSpeed;
+        for (let obs of obstacles) {
           drawObstacle(obs);
-
-          const playerLeft = player.x - 10;
-          const playerRight = player.x + 10;
-          const playerTop = player.y - 45;
-          const playerBottom = player.y;
-
-          let obsLeft = obs.x;
-          let obsRight = obs.x + obs.width;
-          let obsTop = obs.type === 'voador' ? obs.y : canvas.height - 20 - obs.height;
-          let obsBottom = obs.type === 'voador' ? obs.y + obs.height : canvas.height - 20;
-
-          if (
-            playerRight > obsLeft &&
-            playerLeft < obsRight &&
-            playerBottom > obsTop &&
-            playerTop < obsBottom
-          ) {
-            isGameOver = true;
-            isGameRunning = false;
-          }
-
-          if (obs.x + obs.width < 0) {
-            obstacles.splice(i, 1);
-            score += 10;
-            scoreEl.textContent = score;
-
-            if (score > highScore) {
-              highScore = score;
-              highScoreEl.textContent = highScore;
-            }
-
-            if (score % 100 === 0) {
-              gameSpeed += 0.5;
-            }
-          }
         }
+      }
 
-        drawStickman(player.x, player.y, player.animFrame, !player.isGrounded);
-
-        animationFrameId = requestAnimationFrame(loop);
-      } else if (!isGameRunning && !isGameOver) {
-        drawStickman(player.x, canvas.height - 20, 0, false);
+      if (!isGameRunning && !isGameOver) {
+        drawStickman(player.x, player.y, 0, false);
 
         ctx.fillStyle = '#000000';
-        ctx.font = 'bold 18px "Courier New"';
+        ctx.font = 'bold 20px "Courier New"';
         ctx.textAlign = 'center';
-        ctx.fillText('PRESSIONE ESPAÇO PARA INICIAR', canvas.width / 2, canvas.height / 2);
+        ctx.fillText('PRESSIONE ESPAÇO PARA INICIAR', canvas.width / 2, 80);
       } else if (isGameOver) {
         drawStickman(player.x, player.y, 0, true);
 
@@ -344,10 +338,10 @@
         ctx.fillStyle = '#000000';
         ctx.font = 'bold 22px "Courier New"';
         ctx.textAlign = 'center';
-        ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 15);
+        ctx.fillText('GAME OVER', canvas.width / 2, 70);
 
         ctx.font = '14px "Courier New"';
-        ctx.fillText('PRESSIONE ESPAÇO PARA TENTAR NOVAMENTE', canvas.width / 2, canvas.height / 2 + 15);
+        ctx.fillText('PRESSIONE ESPAÇO PARA TENTAR NOVAMENTE', canvas.width / 2, 95);
       }
     }
 
@@ -369,6 +363,12 @@
         jump();
       }
     });
+
+    function loop() {
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
 
     loop();
   </script>
