@@ -11,7 +11,12 @@
       padding: 0;
     }
 
-    body {
+    body
+    <div class="painel-temas">
+    <button onclick="document.body.classList.remove('tema-noite')">☀️ Modo Dia</button>
+    <button onclick="document.body.classList.add('tema-noite')">🌙 Modo Noite</button>
+</div>
+    {
       background-color: #ffffff;
       color: #000000;
       font-family: 'Courier New', Courier, monospace;
